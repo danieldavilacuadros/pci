@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>PCI · Portal Comercial Incamotors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  SHELL PÚBLICO DE PCI. Esta es la ÚNICA página pública: solo trae el login y el cargador.
+  No tiene lógica de negocio. Después del login descarga del bucket PRIVADO `app` de Supabase
+  el núcleo (core/) y los módulos que permite el rol del usuario (la RLS de Storage decide).
+  En localhost (desarrollo) carga los mismos archivos desde la carpeta local en vez del bucket.
+-->
+<style>
+  :root{
+    --gold:#DDA640; --gold-deep:#a97c22; --gold-soft:#f8efdc; --gold-line:#ebd6a4;
+    --silver:#9EA2A7; --silver-soft:#f2f3f4; --silver-line:#dfe1e4;
+    --ink:#141414; --muted:#6a6f75; --card:#ffffff; --bg:#f8f9fa;
+    --danger:#d93025; --ok:#1e8e3e;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    --serif:'Cinzel',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--ink)}
+  .metal{position:fixed;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--silver) 0%,var(--gold) 35%,var(--gold-deep) 60%,var(--silver) 100%);z-index:9999}
+  #acceso{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:16px}
+  .panel{width:100%;max-width:400px;background:var(--card);border:1px solid var(--silver-line);border-radius:16px;padding:32px 28px}
+  #acceso .marca{font-family:var(--serif);font-weight:700;font-size:28px;letter-spacing:.08em;color:var(--gold-deep);margin:0}
+  #acceso .sub{color:var(--muted);font-size:12px;margin:2px 0 22px;letter-spacing:.04em;text-transform:uppercase}
+  .panel h2{font-family:var(--serif);font-size:15px;font-weight:600;margin:0 0 4px}
+  .panel p.d{color:var(--muted);font-size:12px;margin:0 0 6px;line-height:1.5}
+  #acceso label{display:block;font-size:11px;color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+  #acceso input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--silver-line);background:var(--silver-soft);color:var(--ink);font-size:14px;font-family:var(--sans)}
+  #acceso input:focus{outline:none;background:#fff;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+  #acceso button.prim{width:100%;margin-top:20px;padding:12px;border:none;border-radius:8px;background:var(--gold);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--sans)}
+  #acceso button.prim:hover{background:var(--gold-deep)}
+  #acceso button.prim:disabled{opacity:.6;cursor:wait}
+  #acceso .msg{font-size:12px;margin-top:12px;min-height:16px;line-height:1.4}
+  #acceso .msg.err{color:var(--danger)} #acceso .msg.ok{color:var(--ok)}
+  #acceso .pie{margin-top:18px;text-align:center;color:var(--muted);font-size:11px}
+  .oculto{display:none!important}
+  #cargando{min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="metal"></div>
+
+<div id="cargando">Cargando…</div>
+
+<div id="acceso" class="oculto">
+  <div class="panel">
+    <p class="marca">PCI</p>
+    <p class="sub">Portal Comercial Incamotors</p>
+
+    <!-- Login -->
+    <form id="f-login" class="oculto" autocomplete="on">
+      <label for="l-codigo">Usuario</label>
+      <input id="l-codigo" name="username" autocomplete="username" required autofocus>
+      <label for="l-pass">Contraseña</label>
+      <input id="l-pass" name="password" type="password" autocomplete="current-password" required>
+      <button class="prim" type="submit">Ingresar</button>
+      <div class="msg" id="l-msg"></div>
+    </form>
+
+    <!-- Primer administrador: solo aparece si el sistema todavía no tiene ningún usuario -->
+    <form id="f-primer" class="oculto" autocomplete="off">
+      <h2>Configuración inicial</h2>
+      <p class="d">El sistema todavía no tiene usuarios. Crea la cuenta del <b>administrador total</b>.
+         Esta pantalla desaparece apenas exista el primer usuario.</p>
+      <label for="p-nombre">Nombre completo</label>
+      <input id="p-nombre" required>
+      <label for="p-doc">DNI</label>
+      <input id="p-doc" inputmode="numeric">
+      <label for="p-codigo">Usuario (para ingresar)</label>
+      <input id="p-codigo" required placeholder="ej. ddavila" autocomplete="username">
+      <label for="p-pass">Contraseña (mínimo 8 caracteres)</label>
+      <input id="p-pass" type="password" required minlength="8" autocomplete="new-password">
+      <label for="p-pass2">Repite la contraseña</label>
+      <input id="p-pass2" type="password" required minlength="8" autocomplete="new-password">
+      <button class="prim" type="submit">Crear administrador</button>
+      <div class="msg" id="p-msg"></div>
+    </form>
+
+    <div class="pie" id="pie"></div>
+  </div>
+</div>
+
+<div id="pci-app" class="oculto"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+(() => {
+  'use strict';
+  // Clave PUBLICABLE (pública por diseño): sin sesión no da acceso a ningún dato (anon no tiene grants).
+  const CONFIG = {
+    url: 'https://tyxbfklmqfpedrjfrzlx.supabase.co',
+    publishableKey: 'sb_publishable_A5nbdHpcc8KY2nec662Zdw_PAH41oM8',
+    dominioEmail: 'pci.interno',
+    bucket: 'app',
+  };
+  const DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+
+  const sb = window.supabase.createClient(CONFIG.url, CONFIG.publishableKey, {
+    auth: { persistSession: true, autoRefreshToken: true, storageKey: 'pci-sesion' },
+  });
+
+  const $ = (id) => document.getElementById(id);
+  const mostrar = (id, si = true) => $(id).classList.toggle('oculto', !si);
+  const msg = (id, texto, tipo = 'err') => { const el = $(id); el.textContent = texto || ''; el.className = 'msg ' + tipo; };
+
+  // Llama una Edge Function. Con sesión manda el token del usuario; sin sesión, la clave publicable.
+  async function llamarFuncion(nombre, body) {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(`${CONFIG.url}/functions/v1/${nombre}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: CONFIG.publishableKey,
+                 Authorization: `Bearer ${session?.access_token ?? CONFIG.publishableKey}` },
+      body: JSON.stringify(body ?? {}),
+    });
+    let j = null;
+    try { j = await r.json(); } catch { /* respuesta no JSON */ }
+    if (!r.ok || !j?.ok) throw new Error(j?.error || `Error ${r.status} en ${nombre}`);
+    return j.data;
+  }
+
+  // Descarga un archivo de código: del bucket privado (producción) o de la carpeta local (desarrollo).
+  async function leerArchivo(ruta) {
+    if (DEV) {
+      const r = await fetch(`./${ruta}?t=${Date.now()}`);
+      if (!r.ok) throw new Error(`No se encontró ${ruta}`);
+      return r.text();
+    }
+    const { data, error } = await sb.storage.from(CONFIG.bucket).download(ruta);
+    if (error) throw new Error(`Sin acceso a ${ruta}`);
+    return data.text();
+  }
+
+  async function cargarScript(ruta) {
+    const s = document.createElement('script');
+    s.textContent = (await leerArchivo(ruta)) + `\n//# sourceURL=pci/${ruta}`;
+    document.body.appendChild(s);
+  }
+  async function cargarEstilo(ruta) {
+    const st = document.createElement('style');
+    st.textContent = await leerArchivo(ruta);
+    document.head.appendChild(st);
+  }
+
+  // Lo que el núcleo (core.js) recibe del shell.
+  window.PCI = {
+    sb, config: CONFIG, dev: DEV, llamarFuncion, leerArchivo, cargarScript, cargarEstilo,
+    emailDe: (codigo) => `${String(codigo).trim().toLowerCase()}@${CONFIG.dominioEmail}`,
+    salir: async () => { await sb.auth.signOut(); location.reload(); },
+  };
+
+  async function arrancarApp() {
+    mostrar('cargando', true); mostrar('acceso', false);
+    try {
+      await cargarEstilo('core/core.css');
+      await cargarScript('core/core.js');
+      await window.PCI.core.iniciar();
+      mostrar('cargando', false);
+    } catch (e) {
+      console.error(e);
+      await sb.auth.signOut();
+      await mostrarAcceso(`No se pudo iniciar: ${e.message}`);
+    }
+  }
+
+  async function mostrarAcceso(error) {
+    mostrar('cargando', false); mostrar('acceso', true);
+    let hayUsuarios = true;
+    try { hayUsuarios = (await llamarFuncion('admin-usuarios', { accion: 'estado' })).hayUsuarios; }
+    catch (e) { console.warn('estado:', e.message); }
+    mostrar('f-primer', !hayUsuarios);
+    mostrar('f-login', hayUsuarios);
+    if (error) msg(hayUsuarios ? 'l-msg' : 'p-msg', error);
+  }
+
+  $('f-login').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const btn = ev.submitter; btn.disabled = true; msg('l-msg', '');
+    const { error } = await sb.auth.signInWithPassword({ email: PCI.emailDe($('l-codigo').value), password: $('l-pass').value });
+    btn.disabled = false;
+    if (error) return msg('l-msg', 'Usuario o contraseña incorrectos.');
+    $('l-pass').value = '';
+    arrancarApp();
+  });
+
+  $('f-primer').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if ($('p-pass').value !== $('p-pass2').value) return msg('p-msg', 'Las contraseñas no coinciden.');
+    const btn = ev.submitter; btn.disabled = true; msg('p-msg', '');
+    try {
+      const codigo = $('p-codigo').value.trim();
+      await llamarFuncion('admin-usuarios', { accion: 'crearPrimerAdmin', codigo,
+        nombre: $('p-nombre').value.trim(), documento: $('p-doc').value.trim() || null, password: $('p-pass').value });
+      const { error } = await sb.auth.signInWithPassword({ email: PCI.emailDe(codigo), password: $('p-pass').value });
+      if (error) throw error;
+      arrancarApp();
+    } catch (e) { msg('p-msg', e.message); btn.disabled = false; }
+  });
+
+  $('pie').textContent = DEV ? 'Modo desarrollo (código local)' : '';
+
+  sb.auth.getSession().then(({ data: { session } }) => session ? arrancarApp() : mostrarAcceso());
+})();
+</script>
+</body>
+</html>
